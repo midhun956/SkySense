@@ -1,6 +1,16 @@
-# SkySense 🛰️
+<div align="center">
 
-SkySense is an educational, AI-powered GNSS (Global Navigation Satellite System) visualizer built for Android. It turns your device into an advanced satellite tracker, helping you understand how GPS, Galileo, GLONASS, and other constellations work together to pinpoint your location on Earth.
+  <img src="logo.png" alt="SkySense Logo" width="200" height="200">
+
+  # SkySense
+
+  An educational, AI-powered GNSS visualizer built for Android. It turns your device into an advanced satellite tracker, helping you understand how GPS, Galileo, GLONASS, and other constellations work together to pinpoint your location on Earth.
+
+  ![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white)
+  ![Language](https://img.shields.io/badge/Language-Kotlin-7F52FF?style=flat-square&logo=kotlin&logoColor=white)
+  ![AI](https://img.shields.io/badge/AI-Gemini-4285F4?style=flat-square&logo=google&logoColor=white)
+
+</div>
 
 ## 🌟 Features
 
