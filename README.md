@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="logo.png" alt="SkySense Logo" width="200" height="200">
+  <img src="logo_rounded.png" alt="SkySense Logo" width="200" height="200">
 
   # SkySense
 
