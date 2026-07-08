@@ -2,6 +2,7 @@ package com.skysense.app.ui.screens.settings
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -19,6 +20,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.style.TextDecoration
 import com.skysense.app.data.model.PromptProfile
 import com.skysense.app.data.store.SecurePreferencesManager
 import com.skysense.app.ui.theme.*
@@ -44,6 +47,7 @@ fun SettingsContent(
     onClearHistory: () -> Unit,
     onBack: () -> Unit
 ) {
+    val uriHandler = LocalUriHandler.current
     // Use a simple local state approach for the Settings page since we don't have full DI here
     var isAiEnabled by remember { mutableStateOf(false) }
     var apiKeyInput by remember { mutableStateOf("") }
@@ -194,6 +198,13 @@ fun SettingsContent(
                                     "🔒 Keys are encrypted using AES-256-GCM with Android Keystore (hardware-backed). Never sent anywhere except Gemini.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = DimGrey
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    "Don't have a key? Get a free one from Google AI Studio",
+                                    style = MaterialTheme.typography.bodySmall.copy(textDecoration = TextDecoration.Underline),
+                                    color = CosmicBlue,
+                                    modifier = Modifier.clickable { uriHandler.openUri("https://aistudio.google.com/api-keys/") }
                                 )
                                 Button(
                                     onClick = {

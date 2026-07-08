@@ -30,7 +30,10 @@ You can install SkySense directly on your Android device:
 2.  Open the downloaded APK on your Android device.
 3.  If prompted, allow your browser or file manager to "Install unknown apps".
 4.  Once installed, open SkySense and grant the required Location permissions to start receiving satellite data.
-5.  *(Optional)* Navigate to the **Settings** tab in the app and add your Google Gemini API Key to unlock the **Ask AI** feature.
+5.  *(Optional)* To unlock the **Ask AI** feature, you need a free Google Gemini API Key:
+    * Go to [Google AI Studio](https://aistudio.google.com/api-keys/).
+    * Sign in with your Google Account and click **Create API Key**.
+    * Copy the key, open the **Settings** tab in SkySense, and paste it under the AI configuration section.
 
 > **Note:** Android Emulators do not have physical GNSS receivers. To experience the app's full capabilities, it must be installed on a physical Android device outside with a clear view of the sky.
 
