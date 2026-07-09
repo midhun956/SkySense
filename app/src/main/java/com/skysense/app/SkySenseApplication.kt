@@ -5,6 +5,7 @@ import com.skysense.app.data.db.AppDatabase
 import com.skysense.app.data.remote.GeminiApiClient
 import com.skysense.app.data.repository.GnssRepository
 import com.skysense.app.data.sensor.CompassManager
+import com.skysense.app.data.network.NetworkMonitor
 import com.skysense.app.data.store.SecurePreferencesManager
 import com.skysense.app.service.GnssDataService
 
@@ -31,4 +32,6 @@ class SkySenseApplication : Application() {
     val compassManager by lazy { CompassManager(this) }
 
     val geminiClient by lazy { GeminiApiClient() }
+
+    val networkMonitor by lazy { NetworkMonitor(this) }
 }

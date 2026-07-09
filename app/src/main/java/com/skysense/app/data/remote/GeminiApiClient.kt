@@ -36,13 +36,15 @@ class GeminiApiClient {
      * @param profile The prompt style profile to use.
      * @param customPromptText Used only when profile = CUSTOM.
      * @param apiKey The user's Gemini API key (never hardcoded).
+     * @param overrideModelName Optional explicit model choice (e.g. "models/gemini-1.5-flash")
      */
     suspend fun ask(
         userQuestion: String,
         snapshot: GnssSnapshot,
         profile: PromptProfile,
         customPromptText: String = "",
-        apiKey: String
+        apiKey: String,
+        overrideModelName: String? = null
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
             val systemStyle = when (profile) {
@@ -58,7 +60,7 @@ class GeminiApiClient {
                     customPromptText.ifBlank { "Explain clearly and helpfully." }
             }
 
-            val modelName = resolveModel(apiKey)
+            val modelName = overrideModelName ?: resolveModel(apiKey)
             if (modelName == null) {
                 return@withContext Result.failure(Exception("No suitable Gemini model found for this API key. Try generating a new key from Google AI Studio."))
             }
@@ -156,9 +158,10 @@ class GeminiApiClient {
         }
     }
 
-    private suspend fun resolveModel(apiKey: String): String? = withContext(Dispatchers.IO) {
-        if (resolvedModel != null) return@withContext resolvedModel
-
+    /**
+     * Fetches all available generative text models for the given API key.
+     */
+    suspend fun getAvailableModels(apiKey: String): Result<List<String>> = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder()
                 .url("${baseUrl}models?key=$apiKey")
@@ -166,20 +169,51 @@ class GeminiApiClient {
                 .build()
 
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext null
-                val body = response.body?.string() ?: return@withContext null
+                if (!response.isSuccessful) {
+                    return@withContext Result.failure(Exception("Failed to fetch models: ${response.code}"))
+                }
+                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty response"))
                 
                 @Suppress("UNCHECKED_CAST")
-                val map = gson.fromJson(body, Map::class.java) as? Map<String, Any> ?: return@withContext null
-                val models = map["models"] as? List<Map<String, Any>> ?: return@withContext null
+                val map = gson.fromJson(body, Map::class.java) as? Map<String, Any> ?: return@withContext Result.failure(Exception("Invalid JSON"))
+                val models = map["models"] as? List<Map<String, Any>> ?: return@withContext Result.failure(Exception("No models array"))
 
                 val availableModels = models.filter { model ->
                     val methods = model["supportedGenerationMethods"] as? List<String>
-                    methods?.contains("generateContent") == true
-                }.mapNotNull { it["name"] as? String }
+                    val name = (model["name"] as? String)?.lowercase() ?: return@filter false
+                    
+                    val hasGenerateContent = methods?.contains("generateContent") == true
+                    
+                    // Only explicitly include models known to have > 0 limits on the free tier, and exclude TTS/preview variants
+                    val isUsable = (name.contains("gemini-1.5-flash") ||
+                                   name.contains("gemini-2.5-flash") ||
+                                   name.contains("gemini-3-flash") ||
+                                   name.contains("gemini-3.1-flash-lite") ||
+                                   name.contains("gemini-3.5-flash") ||
+                                   name.contains("gemma-4")) &&
+                                   !name.contains("pro") &&
+                                   !name.contains("tts") &&
+                                   !name.contains("preview")
 
-                // Prefer a flash model, fallback to any gemini model
-                val chosenModel = availableModels.firstOrNull { it.contains("gemini-1.5-flash") }
+                    hasGenerateContent && isUsable
+                }.mapNotNull { it["name"] as? String }
+                
+                Result.success(availableModels)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun resolveModel(apiKey: String): String? = withContext(Dispatchers.IO) {
+        if (resolvedModel != null) return@withContext resolvedModel
+
+        getAvailableModels(apiKey).onSuccess { availableModels ->
+            if (availableModels.isEmpty()) return@withContext null
+
+                // Prefer the 3.1 Flash Lite model for highest free tier limits, fallback to other gemini models
+                val chosenModel = availableModels.firstOrNull { it.contains("gemini-3.1-flash-lite") }
+                    ?: availableModels.firstOrNull { it.contains("gemini-1.5-flash") }
                     ?: availableModels.firstOrNull { it.contains("gemini") }
                     ?: availableModels.firstOrNull()
 
@@ -187,10 +221,10 @@ class GeminiApiClient {
                     resolvedModel = chosenModel
                 }
                 return@withContext chosenModel
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
+        }.onFailure {
+            it.printStackTrace()
             return@withContext null
         }
+        return@withContext null
     }
 }

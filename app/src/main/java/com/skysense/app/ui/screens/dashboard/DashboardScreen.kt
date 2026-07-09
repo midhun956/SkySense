@@ -82,6 +82,27 @@ fun DashboardScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (!state.isLocationEnabled) {
+                Surface(
+                    color = SignalPoor.copy(alpha = 0.15f),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.LocationOff, "Location Disabled", tint = SignalPoor, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            "Location Services Disabled. Please turn on GPS to receive satellite data.",
+                            color = SignalPoor,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+
             // ── GPS Status indicator ──────────────────────────────────────────
             GpsStatusIndicator(isActive = state.isReceivingUpdates)
 

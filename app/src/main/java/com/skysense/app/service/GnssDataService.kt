@@ -17,6 +17,9 @@ import com.skysense.app.data.model.SatelliteInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import android.content.BroadcastReceiver
+import android.content.Intent
+import android.content.IntentFilter
 import kotlin.math.sqrt
 
 /**
@@ -47,6 +50,9 @@ class GnssDataService(private val context: Context) {
     private val _isReceivingUpdates = MutableStateFlow(false)
     val isReceivingUpdates: StateFlow<Boolean> = _isReceivingUpdates.asStateFlow()
 
+    private val _isLocationEnabled = MutableStateFlow(locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER))
+    val isLocationEnabled: StateFlow<Boolean> = _isLocationEnabled.asStateFlow()
+
     // ── Internal tracking ─────────────────────────────────────────────────────
 
     // cn0 map from measurements: svid+constellation → cn0
@@ -65,9 +71,20 @@ class GnssDataService(private val context: Context) {
         }
         @Deprecated("Deprecated in Java")
         override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
-        override fun onProviderEnabled(provider: String) {}
+        override fun onProviderEnabled(provider: String) {
+            if (provider == LocationManager.GPS_PROVIDER) _isLocationEnabled.value = true
+        }
         override fun onProviderDisabled(provider: String) {
+            if (provider == LocationManager.GPS_PROVIDER) _isLocationEnabled.value = false
             _isReceivingUpdates.value = false
+        }
+    }
+
+    private val providersChangedReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == LocationManager.PROVIDERS_CHANGED_ACTION) {
+                _isLocationEnabled.value = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+            }
         }
     }
 
@@ -114,9 +131,14 @@ class GnssDataService(private val context: Context) {
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-    @SuppressLint("MissingPermission")
+    @SuppressLint("MissingPermission", "UnspecifiedRegisterReceiverFlag")
     fun start() {
         try {
+            _isLocationEnabled.value = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+            context.registerReceiver(
+                providersChangedReceiver,
+                IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION)
+            )
             locationManager.requestLocationUpdates(
                 LocationManager.GPS_PROVIDER,
                 MIN_TIME_MS,
@@ -133,6 +155,11 @@ class GnssDataService(private val context: Context) {
     }
 
     fun stop() {
+        try {
+            context.unregisterReceiver(providersChangedReceiver)
+        } catch (e: Exception) {
+            // Ignore if not registered
+        }
         try {
             locationManager.removeUpdates(locationListener)
             locationManager.unregisterGnssStatusCallback(gnssStatusCallback)

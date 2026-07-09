@@ -11,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.skysense.app.data.network.NetworkMonitor
 import com.skysense.app.data.remote.GeminiApiClient
 import com.skysense.app.data.repository.GnssRepository
 import com.skysense.app.data.store.SecurePreferencesManager
@@ -39,7 +41,8 @@ private val suggestedQuestions = listOf(
     "What is Galileo and how does it help?",
     "Why are some satellites not being used?",
     "What is the difference between L1 and L5?",
-    "How does GPS actually know where I am?"
+    "How does GPS actually know where I am?",
+    "What's my currnet location?"
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,6 +51,7 @@ fun AskAiScreen(
     repository: GnssRepository,
     prefsManager: SecurePreferencesManager,
     geminiClient: GeminiApiClient,
+    networkMonitor: NetworkMonitor,
     onNavigateToSettings: () -> Unit
 ) {
     val activity = LocalContext.current as ComponentActivity
@@ -56,7 +60,9 @@ fun AskAiScreen(
         factory = AskAiViewModel.Factory(repository, prefsManager, geminiClient)
     )
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isOnline by networkMonitor.isOnline.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    var showModelSelector by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) {
@@ -69,17 +75,35 @@ fun AskAiScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Default.AutoAwesome, null, tint = CosmicBlue, modifier = Modifier.size(20.dp))
-                        Text("Ask AI", color = StarWhite)
-                        if (state.isAiEnabled && state.apiKeySet) {
-                            Surface(shape = RoundedCornerShape(50), color = SignalExcellent.copy(alpha = 0.15f)) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.AutoAwesome, null, tint = CosmicBlue, modifier = Modifier.size(20.dp))
+                            Text(if (isOnline) "Ask AI" else "Ask AI (Offline)", color = if (isOnline) StarWhite else SignalPoor)
+                            if (state.isAiEnabled && state.apiKeySet) {
+                                Surface(shape = RoundedCornerShape(50), color = SignalExcellent.copy(alpha = 0.15f)) {
+                                    Text(
+                                        state.promptProfile.displayName,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = SignalExcellent
+                                    )
+                                }
+                            }
+                        }
+                        if (state.isAiEnabled && state.apiKeySet && state.selectedModel != null) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(top = 4.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .clickable { showModelSelector = true },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
-                                    state.promptProfile.displayName,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                    text = "Model: ${state.selectedModel}",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = SignalExcellent
+                                    color = DimGrey
                                 )
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = "Change Model", tint = DimGrey, modifier = Modifier.size(16.dp))
                             }
                         }
                     }
@@ -99,7 +123,7 @@ fun AskAiScreen(
         },
         containerColor = SpaceBlack,
         bottomBar = {
-            if (state.isAiEnabled && state.apiKeySet) {
+            if (state.isAiEnabled && state.apiKeySet && isOnline) {
                 ChatInputBar(
                     value = state.currentInput,
                     onValueChange = viewModel::onInputChanged,
@@ -114,6 +138,24 @@ fun AskAiScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            if (!isOnline) {
+                Surface(
+                    color = SignalPoor.copy(alpha = 0.15f),
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Default.WifiOff, "Offline", tint = SignalPoor, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("You are offline. Connect to the internet to ask AI.", color = SignalPoor, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+
             if (!state.isAiEnabled || !state.apiKeySet) {
                 AiDisabledState(
                     isAiEnabled = state.isAiEnabled,
@@ -139,6 +181,69 @@ fun AskAiScreen(
                     }
                     item { Spacer(Modifier.height(20.dp)) }
                 }
+            }
+        }
+    }
+
+    if (showModelSelector) {
+        ModalBottomSheet(
+            onDismissRequest = { showModelSelector = false },
+            containerColor = SpaceCard
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    "Select AI Model",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = StarWhite,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Text(
+                    "Free-tier limits are hardcoded approximations. Actual limits may vary based on your Google account.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DimGrey,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(state.availableModels) { model ->
+                        val isSelected = model == state.selectedModel
+                        val limitText = when {
+                            model.contains("gemini-3.1-flash-lite") -> "15 RPM / 500 RPD"
+                            model.contains("gemini-2.5-flash-lite") -> "10 RPM / 20 RPD"
+                            model.contains("gemini-1.5-flash") -> "15 RPM / 1500 RPD"
+                            model.contains("flash") -> "5 RPM / 20 RPD"
+                            else -> "Standard Limit"
+                        }
+
+                        Surface(
+                            onClick = {
+                                viewModel.onModelSelected(model)
+                                showModelSelector = false
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) CosmicBlue.copy(alpha = 0.2f) else SpaceDeep,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(model, color = if (isSelected) CosmicBlue else StarWhite, style = MaterialTheme.typography.bodyMedium)
+                                    Text(limitText, color = MoonGrey, style = MaterialTheme.typography.labelSmall)
+                                }
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, "Selected", tint = CosmicBlue)
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }

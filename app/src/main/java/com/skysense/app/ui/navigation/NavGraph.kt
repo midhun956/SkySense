@@ -96,6 +96,7 @@ fun NavGraph(
                 repository = app.gnssRepository,
                 prefsManager = app.prefsManager,
                 geminiClient = app.geminiClient,
+                networkMonitor = app.networkMonitor,
                 onNavigateToSettings = { navController.navigate(Destination.Settings.route) }
             )
         }

@@ -3,6 +3,7 @@ package com.skysense.app.ui.screens.askai
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.skysense.app.data.network.NetworkMonitor
 import com.skysense.app.data.remote.GeminiApiClient
 import com.skysense.app.data.repository.GnssRepository
 import com.skysense.app.data.store.SecurePreferencesManager
@@ -25,7 +26,9 @@ data class AskAiUiState(
     val isLoading: Boolean = false,
     val isAiEnabled: Boolean = false,
     val apiKeySet: Boolean = false,
-    val promptProfile: PromptProfile = PromptProfile.BEGINNER
+    val promptProfile: PromptProfile = PromptProfile.BEGINNER,
+    val availableModels: List<String> = emptyList(),
+    val selectedModel: String? = null
 )
 
 class AskAiViewModel(
@@ -37,6 +40,30 @@ class AskAiViewModel(
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     private val _currentInput = MutableStateFlow("")
     private val _isLoading = MutableStateFlow(false)
+    private val _availableModels = MutableStateFlow<List<String>>(emptyList())
+    private val _selectedModel = MutableStateFlow<String?>(null)
+
+    init {
+        viewModelScope.launch {
+            prefsManager.apiKey.collect { key ->
+                if (!key.isNullOrBlank()) {
+                    geminiClient.getAvailableModels(key).onSuccess { models ->
+                        _availableModels.value = models
+                        // Automatically select the best model if not already selected manually
+                        if (_selectedModel.value == null && models.isNotEmpty()) {
+                            _selectedModel.value = models.firstOrNull { it.contains("gemini-3.1-flash-lite") }
+                                ?: models.firstOrNull { it.contains("gemini-1.5-flash") }
+                                ?: models.firstOrNull { it.contains("gemini") }
+                                ?: models.first()
+                        }
+                    }
+                } else {
+                    _availableModels.value = emptyList()
+                    _selectedModel.value = null
+                }
+            }
+        }
+    }
 
     val uiState: StateFlow<AskAiUiState> = combine(
         _messages,
@@ -44,7 +71,9 @@ class AskAiViewModel(
         _isLoading,
         prefsManager.isAiEnabled,
         prefsManager.apiKey,
-        prefsManager.promptProfile
+        prefsManager.promptProfile,
+        _availableModels,
+        _selectedModel
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         val messages = values[0] as List<ChatMessage>
@@ -53,13 +82,17 @@ class AskAiViewModel(
         val enabled = values[3] as Boolean
         val key = values[4] as String?
         val profile = values[5] as PromptProfile
+        val models = values[6] as List<String>
+        val selected = values[7] as String?
         AskAiUiState(
             messages = messages,
             currentInput = input,
             isLoading = loading,
             isAiEnabled = enabled,
             apiKeySet = !key.isNullOrBlank(),
-            promptProfile = profile
+            promptProfile = profile,
+            availableModels = models,
+            selectedModel = selected
         )
     }.stateIn(
         scope = viewModelScope,
@@ -68,6 +101,8 @@ class AskAiViewModel(
     )
 
     fun onInputChanged(text: String) { _currentInput.value = text }
+    
+    fun onModelSelected(model: String) { _selectedModel.value = model }
 
     fun sendMessage() {
         val text = _currentInput.value.trim()
@@ -101,7 +136,8 @@ class AskAiViewModel(
                 snapshot = snapshot,
                 profile = profile,
                 customPromptText = customPrompt,
-                apiKey = apiKey
+                apiKey = apiKey,
+                overrideModelName = _selectedModel.value
             )
 
             _messages.value = _messages.value.dropLast(1) + result.fold(

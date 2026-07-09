@@ -27,6 +27,7 @@ class GnssRepository(
     val liveSnapshot: StateFlow<GnssSnapshot> = gnssDataService.snapshot
     val liveSatellites: StateFlow<List<SatelliteInfo>> = gnssDataService.satellites
     val isReceivingUpdates: StateFlow<Boolean> = gnssDataService.isReceivingUpdates
+    val isLocationEnabled: StateFlow<Boolean> = gnssDataService.isLocationEnabled
 
     private var recordingJob: Job? = null
 

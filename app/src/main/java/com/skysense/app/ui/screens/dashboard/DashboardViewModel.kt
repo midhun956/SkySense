@@ -17,7 +17,8 @@ data class DashboardUiState(
     val snapshot: GnssSnapshot = GnssSnapshot(),
     val satellites: List<SatelliteInfo> = emptyList(),
     val overviewCard: OverviewCard = LocalInterpretationEngine.buildOverviewCard(GnssSnapshot()),
-    val isReceivingUpdates: Boolean = false
+    val isReceivingUpdates: Boolean = false,
+    val isLocationEnabled: Boolean = true
 )
 
 class DashboardViewModel(private val repository: GnssRepository) : ViewModel() {
@@ -25,13 +26,15 @@ class DashboardViewModel(private val repository: GnssRepository) : ViewModel() {
     val uiState: StateFlow<DashboardUiState> = combine(
         repository.liveSnapshot,
         repository.liveSatellites,
-        repository.isReceivingUpdates
-    ) { snapshot, satellites, receiving ->
+        repository.isReceivingUpdates,
+        repository.isLocationEnabled
+    ) { snapshot, satellites, receiving, locationEnabled ->
         DashboardUiState(
             snapshot = snapshot,
             satellites = satellites,
             overviewCard = LocalInterpretationEngine.buildOverviewCard(snapshot),
-            isReceivingUpdates = receiving
+            isReceivingUpdates = receiving,
+            isLocationEnabled = locationEnabled
         )
     }.stateIn(
         scope = viewModelScope,
