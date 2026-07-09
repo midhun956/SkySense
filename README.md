@@ -39,16 +39,25 @@ You can install SkySense directly on your Android device:
 
 ## 🏗️ Project Architecture
 
-SkySense is built using modern Android development practices, following an MVVM (Model-View-ViewModel) architecture:
-
-*   **UI Layer (Compose):** 100% built with Jetpack Compose for a reactive, declarative, and smooth user interface. State is collected safely using `collectAsStateWithLifecycle`.
-*   **Presentation Layer (ViewModels):** Manages UI state, handles user intents, and communicates with the data layer using Kotlin Coroutines and Flows.
-*   **Domain Layer:** Contains offline, rule-based interpretation logic (`LocalInterpretationEngine`) to transform raw mathematical GNSS metrics into human-readable insights.
-*   **Data Layer (Repositories & Services):**
-    *   **Live Data:** Uses Android's native `GnssStatus` and `LocationManager` APIs wrapped in an Android Service to stream live satellite metrics as Kotlin Flows.
-    *   **Persistence:** Uses Room Database for local caching of session history and analytics.
-    *   **Remote/AI:** Uses the official Google Gemini SDK to send context-aware prompts based on the current GNSS state.
-    *   **Security:** Utilizes Google Tink and Jetpack DataStore to securely encrypt and store API keys.
+```text
+com.skysense.app/
+├── data/
+│   ├── db/             # Room database, DAOs, entities
+│   ├── model/          # Domain models (SatelliteInfo, GnssSnapshot, etc.)
+│   ├── repository/     # GnssRepository, HistoryRepository
+│   └── remote/         # GeminiApiClient (OkHttp)
+├── service/
+│   └── GnssService     # LocationManager + GnssStatus + GnssMeasurements
+├── ui/
+│   ├── theme/          # Color, Type, Theme (Space dark M3)
+│   ├── navigation/     # NavHost, Destinations
+│   ├── dashboard/      # DashboardScreen + ViewModel
+│   ├── skymap/         # SkyMapScreen + Canvas sky plot + ViewModel
+│   ├── satellite/      # SatelliteDetailScreen
+│   ├── constellation/  # ConstellationExplorerScreen
+│   └── learn/          # Learn GNSS glossary screen
+└── domain/             # LocalInterpretationEngine (Pure Kotlin)
+```
 
 ## 🔒 Privacy & Permissions
 
