@@ -17,8 +17,9 @@
 *   **Live Sky Map:** Watch satellites orbit overhead in real-time on a beautifully animated, compass-reactive sky plot.
 *   **Deep Satellite Analytics:** Track detailed telemetry including Elevation, Azimuth, Signal-to-Noise Ratio (C/N₀), and dual-band frequencies (L1/L5). 
 *   **Multi-Constellation Support:** Supports and maps signals from GPS (USA), GLONASS (Russia), Galileo (EU), BeiDou (China), QZSS (Japan), and IRNSS/NavIC (India).
-*   **Live Dashboard:** Instantly view real-time accuracy estimations and Dilution of Precision (PDOP/HDOP/VDOP) with easy-to-understand explanations driven by a local interpretation engine.
-*   **Ask AI Integration:** Powered by Google Gemini, ask context-aware questions about your live GNSS data ("Why is my accuracy poor right now?", "What's the difference between L1 and L5?").
+*   **Live Dashboard & Weather:** Instantly view real-time accuracy estimations, Dilution of Precision (PDOP/HDOP/VDOP), and live local weather conditions (powered by Open-Meteo) in one unified dashboard.
+*   **Ask AI Integration:** Powered by Google Gemini, ask context-aware questions. The AI is injected with your live GNSS telemetry in real-time to provide highly accurate, contextual answers.
+*   **Premium Haptic Engine:** A rich, state-driven tactile experience that physically responds to your actions (e.g., dial-ticks when selecting satellites, or distinct rumbles for success/failure).
 *   **Constellation Explorer:** Learn the history, purpose, and fun facts about the global navigation systems orbiting above us.
 *   **Session History & Analytics:** View graphs and trends of your satellite connections and accuracy over time.
 
@@ -26,7 +27,7 @@
 
 You can install SkySense directly on your Android device:
 
-1.  Download the latest `app-release.apk` from the **[Releases](https://github.com/midhun956/SkySense/releases/)** section of this repository.
+1.  Download the latest `SkySense.apk` from the **[Releases](https://github.com/midhun956/SkySense/releases/)** section of this repository.
 2.  Open the downloaded APK on your Android device.
 3.  If prompted, allow your browser or file manager to "Install unknown apps".
 4.  Once installed, open SkySense and grant the required Location permissions to start receiving satellite data.
@@ -62,7 +63,7 @@ com.skysense.app/
 ## 🔒 Privacy & Permissions
 
 SkySense requires `ACCESS_FINE_LOCATION` to access the raw GNSS measurements from the Android OS. 
-All interpretation and data plotting is done entirely **offline on your device**. Location data is never sent to any external server, except when explicitly using the "Ask AI" feature, which sends a snapshot of your current satellite metrics (not your coordinates) to the Gemini API.
+All interpretation and data plotting is done entirely **offline on your device**. Location data is never sent to any external server, except when explicitly using the "Ask AI" feature, which sends a snapshot of your current satellite metrics to the Gemini API.
 
 ## 🛠️ Built With
 
@@ -70,8 +71,3 @@ All interpretation and data plotting is done entirely **offline on your device**
 *   **Google Gemini API** (Generative AI integration)
 *   **Jetpack DataStore & Google Tink** (Encrypted preferences)
 *   **Room Database** (Local persistence)
-*   **Coroutines & Flows** (Asynchronous programming)
-
-## 📝 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
