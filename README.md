@@ -12,6 +12,14 @@
 
 </div>
 
+## 📸 Screenshots
+
+<p align="center">
+  <img src="screenshots/sky_map.png" alt="Sky Map" width="30%">
+  <img src="screenshots/history.png" alt="History and Analytics" width="30%">
+  <img src="screenshots/ask_ai.png" alt="Ask AI" width="30%">
+</p>
+
 ## 🌟 Features
 
 *   **Live Sky Map:** Watch satellites orbit overhead in real-time on a beautifully animated, compass-reactive sky plot.
