@@ -15,9 +15,9 @@
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="screenshots/sky_map.jpg" alt="Sky Map" width="30%">
-  <img src="screenshots/history.jpg" alt="History and Analytics" width="30%">
-  <img src="screenshots/ask_ai.jpg" alt="Ask AI" width="30%">
+  <img src="screenshots/sky_map.jpg?v=2" alt="Sky Map" width="30%">
+  <img src="screenshots/history.jpg?v=2" alt="History and Analytics" width="30%">
+  <img src="screenshots/ask_ai.jpg?v=2" alt="Ask AI" width="30%">
 </p>
 
 ## 🌟 Features
