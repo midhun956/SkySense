@@ -22,6 +22,9 @@ import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.platform.LocalView
+import com.skysense.app.util.*
+import android.view.HapticFeedbackConstants
 import com.skysense.app.data.model.PromptProfile
 import com.skysense.app.data.store.SecurePreferencesManager
 import com.skysense.app.ui.theme.*
@@ -48,6 +51,7 @@ fun SettingsContent(
     onBack: () -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
+    val view = LocalView.current
     // Use a simple local state approach for the Settings page since we don't have full DI here
     var isAiEnabled by remember { mutableStateOf(false) }
     var apiKeyInput by remember { mutableStateOf("") }
@@ -123,6 +127,7 @@ fun SettingsContent(
                         Switch(
                             checked = isAiEnabled,
                             onCheckedChange = { enabled ->
+                                if (enabled) view.performHapticToggleOn() else view.performHapticToggleOff()
                                 isAiEnabled = enabled
                                 kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                                     prefsManager.setAiEnabled(enabled)
@@ -157,6 +162,7 @@ fun SettingsContent(
                                         }
                                         TextButton(
                                             onClick = {
+                                                view.performHapticReject()
                                                 kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                                                     prefsManager.clearApiKey()
                                                     savedMessage = "API key removed"
@@ -208,6 +214,7 @@ fun SettingsContent(
                                 )
                                 Button(
                                     onClick = {
+                                        view.performHapticConfirm()
                                         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                                             prefsManager.saveApiKey(apiKeyInput)
                                             apiKeyInput = ""
@@ -233,6 +240,7 @@ fun SettingsContent(
                                         profile = profile,
                                         selected = selectedProfile == profile,
                                         onClick = {
+                                            view.performHapticSegmentTick()
                                             selectedProfile = profile
                                             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                                                 prefsManager.setPromptProfile(profile)
@@ -260,6 +268,7 @@ fun SettingsContent(
                                         )
                                         Button(
                                             onClick = {
+                                                view.performHapticConfirm()
                                                 kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                                                     prefsManager.setCustomPrompt(customPrompt)
                                                     savedMessage = "Custom prompt saved ✓"
@@ -301,11 +310,12 @@ fun SettingsContent(
             SettingsSection(title = "About", icon = Icons.Default.Info) {
                 SettingsItem {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        AboutRow("App", "SkySense v1.1.0")
+                        AboutRow("App", "SkySense v2.0.0")
                         AboutRow("Architecture", "MVVM + Repository + StateFlow")
                         AboutRow("Storage", "Room Database + DataStore")
                         AboutRow("Security", "AES-256-GCM (Tink + Android Keystore)")
-                        AboutRow("AI", "Gemini API (user key required)")
+                        AboutRow("AI", "Gemini API (Live GNSS Injection)")
+                        AboutRow("UI/UX", "Material 3 + Rich Contextual Haptics")
                     }
                 }
             }
@@ -321,6 +331,7 @@ fun SettingsContent(
             text = { Text("This will permanently delete all stored GNSS history. This cannot be undone.", color = MoonGrey) },
             confirmButton = {
                 TextButton(onClick = {
+                    view.performHapticReject()
                     showClearConfirm = false
                     onClearHistory()
                     savedMessage = "History cleared"

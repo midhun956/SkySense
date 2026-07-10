@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.skysense.app.data.network.NetworkMonitor
 import com.skysense.app.data.remote.GeminiApiClient
+import com.skysense.app.data.repository.EnvironmentRepository
 import com.skysense.app.data.repository.GnssRepository
 import com.skysense.app.data.store.SecurePreferencesManager
 import com.skysense.app.data.model.PromptProfile
@@ -33,6 +34,7 @@ data class AskAiUiState(
 
 class AskAiViewModel(
     private val repository: GnssRepository,
+    private val environmentRepository: EnvironmentRepository,
     private val prefsManager: SecurePreferencesManager,
     private val geminiClient: GeminiApiClient
 ) : ViewModel() {
@@ -128,12 +130,16 @@ class AskAiViewModel(
             }
 
             val snapshot = repository.liveSnapshot.value
+            val satellites = repository.liveSatellites.value
+            val envData = environmentRepository.environmentData.value
             val profile = prefsManager.promptProfile.first()
             val customPrompt = prefsManager.customPrompt.first()
 
             val result = geminiClient.ask(
                 userQuestion = text,
                 snapshot = snapshot,
+                satellites = satellites,
+                envData = envData,
                 profile = profile,
                 customPromptText = customPrompt,
                 apiKey = apiKey,
@@ -155,12 +161,13 @@ class AskAiViewModel(
 
     class Factory(
         private val repository: GnssRepository,
+        private val environmentRepository: EnvironmentRepository,
         private val prefsManager: SecurePreferencesManager,
         private val geminiClient: GeminiApiClient
     ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             @Suppress("UNCHECKED_CAST")
-            return AskAiViewModel(repository, prefsManager, geminiClient) as T
+            return AskAiViewModel(repository, environmentRepository, prefsManager, geminiClient) as T
         }
     }
 }

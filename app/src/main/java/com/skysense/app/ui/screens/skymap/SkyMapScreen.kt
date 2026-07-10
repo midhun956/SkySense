@@ -30,7 +30,10 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.*
+import androidx.compose.ui.platform.LocalView
+import com.skysense.app.util.performHapticSegmentTick
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -89,11 +92,13 @@ fun SkyMapScreen(
                 if (satellites.isEmpty()) {
                     EmptySkyState(receiving)
                 } else {
+                    val view = LocalView.current
                     SkyPlot(
                         satellites = satellites,
                         selected = selected,
                         heading = animatedHeading,
                         onSatelliteTap = { sat ->
+                            view.performHapticSegmentTick()
                             viewModel.selectSatellite(sat)
                             onSatelliteClick(sat.svid, sat.constellation.name, sat.frequencyBandLabel)
                         }
@@ -178,8 +183,14 @@ private fun SkyPlot(
                     }
                 }
             }
+            .onSizeChanged { newSize ->
+                val newW = newSize.width.toFloat()
+                val newH = newSize.height.toFloat()
+                if (canvasSize.first != newW || canvasSize.second != newH) {
+                    canvasSize = Pair(newW, newH)
+                }
+            }
     ) {
-        canvasSize = Pair(size.width, size.height)
         val cx = size.width / 2f
         val cy = size.height / 2f
         val maxR = minOf(size.width, size.height) / 2f * 0.9f
@@ -483,9 +494,16 @@ private fun SatelliteListBottomSheet(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(filteredSats) { sat ->
+                items(
+                    items = filteredSats,
+                    key = { "${it.constellation.name}_${it.svid}_${it.carrierFrequencyHz}" }
+                ) { sat ->
+                    val view = LocalView.current
                     Surface(
-                        onClick = { onSatelliteClick(sat) },
+                        onClick = {
+                            view.performHapticSegmentTick()
+                            onSatelliteClick(sat)
+                        },
                         shape = RoundedCornerShape(12.dp),
                         color = SpaceCard,
                         modifier = Modifier.fillMaxWidth()

@@ -21,14 +21,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.LocalView
+import android.view.HapticFeedbackConstants
+import kotlinx.coroutines.launch
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.skysense.app.util.*
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.skysense.app.data.network.NetworkMonitor
 import com.skysense.app.data.remote.GeminiApiClient
@@ -38,17 +44,16 @@ import com.skysense.app.ui.theme.*
 
 private val suggestedQuestions = listOf(
     "Why is my GPS accuracy poor?",
-    "What is Galileo and how does it help?",
     "Why are some satellites not being used?",
     "What is the difference between L1 and L5?",
-    "How does GPS actually know where I am?",
-    "What's my currnet location?"
+    "What's my current location?"
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AskAiScreen(
     repository: GnssRepository,
+    environmentRepository: com.skysense.app.data.repository.EnvironmentRepository,
     prefsManager: SecurePreferencesManager,
     geminiClient: GeminiApiClient,
     networkMonitor: NetworkMonitor,
@@ -57,12 +62,30 @@ fun AskAiScreen(
     val activity = LocalContext.current as ComponentActivity
     val viewModel: AskAiViewModel = viewModel(
         viewModelStoreOwner = activity,
-        factory = AskAiViewModel.Factory(repository, prefsManager, geminiClient)
+        factory = AskAiViewModel.Factory(repository, environmentRepository, prefsManager, geminiClient)
     )
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val isOnline by networkMonitor.isOnline.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     var showModelSelector by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+    val view = LocalView.current
+    var previousIsLoading by remember { mutableStateOf(state.isLoading) }
+
+    LaunchedEffect(state.isLoading) {
+        if (previousIsLoading && !state.isLoading) {
+            val lastMsg = state.messages.lastOrNull()
+            if (lastMsg != null && !lastMsg.isUser) {
+                if (lastMsg.isError) {
+                    view.performHapticReject()
+                } else {
+                    view.performHapticConfirm()
+                }
+            }
+        }
+        previousIsLoading = state.isLoading
+    }
 
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) {
@@ -70,60 +93,150 @@ fun AskAiScreen(
         }
     }
 
-    Scaffold(
-        modifier = Modifier.imePadding(),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Default.AutoAwesome, null, tint = CosmicBlue, modifier = Modifier.size(20.dp))
-                            Text(if (isOnline) "Ask AI" else "Ask AI (Offline)", color = if (isOnline) StarWhite else SignalPoor)
-                            if (state.isAiEnabled && state.apiKeySet) {
-                                Surface(shape = RoundedCornerShape(50), color = SignalExcellent.copy(alpha = 0.15f)) {
+    val infiniteTransition = rememberInfiniteTransition()
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f, targetValue = 0.6f,
+        animationSpec = infiniteRepeatable(tween(3000, easing = LinearEasing), RepeatMode.Reverse)
+    )
+
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        // Blue flowing gradient at the bottom, behind Scaffold
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(400.dp)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Transparent, CosmicBlueDark.copy(alpha = glowAlpha))
+                    )
+                )
+        )
+
+        Scaffold(
+            modifier = Modifier.imePadding(),
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.AutoAwesome, null, tint = CosmicBlue, modifier = Modifier.size(20.dp))
+                                Text(if (isOnline) "Ask AI" else "Ask AI (Offline)", color = if (isOnline) StarWhite else SignalPoor)
+                                if (state.isAiEnabled && state.apiKeySet) {
+                                    Surface(shape = RoundedCornerShape(50), color = SignalExcellent.copy(alpha = 0.15f)) {
+                                        Text(
+                                            state.promptProfile.displayName,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = SignalExcellent
+                                        )
+                                    }
+                                }
+                            }
+                            if (state.isAiEnabled && state.apiKeySet && state.selectedModel != null) {
+                                Row(
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .clickable { 
+                                            view.performHapticSegmentTick()
+                                            showModelSelector = true 
+                                        },
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Text(
-                                        state.promptProfile.displayName,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                        text = "Model: ${state.selectedModel}",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = SignalExcellent
+                                        color = DimGrey
                                     )
+                                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Change Model", tint = DimGrey, modifier = Modifier.size(16.dp))
                                 }
                             }
                         }
-                        if (state.isAiEnabled && state.apiKeySet && state.selectedModel != null) {
-                            Row(
-                                modifier = Modifier
-                                    .padding(top = 4.dp)
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .clickable { showModelSelector = true },
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Model: ${state.selectedModel}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = DimGrey
-                                )
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = "Change Model", tint = DimGrey, modifier = Modifier.size(16.dp))
+                    },
+                    actions = {
+                        val view = LocalView.current
+                        if (state.messages.isNotEmpty()) {
+                            IconButton(onClick = {
+                                view.performHapticReject()
+                                viewModel.clearConversation()
+                            }) {
+                                Icon(Icons.Default.DeleteSweep, "Clear", tint = DimGrey)
                             }
                         }
-                    }
-                },
-                actions = {
-                    if (state.messages.isNotEmpty()) {
-                        IconButton(onClick = viewModel::clearConversation) {
-                            Icon(Icons.Default.DeleteSweep, "Clear", tint = DimGrey)
+                        IconButton(onClick = {
+                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                            onNavigateToSettings()
+                        }) {
+                            Icon(Icons.Default.Settings, "Settings", tint = DimGrey)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                )
+            },
+            containerColor = Color.Transparent
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                if (!isOnline) {
+                    Surface(
+                        color = SignalPoor.copy(alpha = 0.15f),
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.WifiOff, "Offline", tint = SignalPoor, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("You are offline. Connect to the internet to ask AI.", color = SignalPoor, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, "Settings", tint = DimGrey)
+                }
+
+                if (!state.isAiEnabled || !state.apiKeySet) {
+                    AiDisabledState(
+                        isAiEnabled = state.isAiEnabled,
+                        apiKeySet = state.apiKeySet,
+                        onNavigateToSettings = onNavigateToSettings
+                    )
+                } else if (state.messages.isEmpty()) {
+                    WelcomeState(
+                        onQuestionClick = {
+                            viewModel.onInputChanged(it)
+                            viewModel.sendMessage()
+                        }
+                    )
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize().weight(1f),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(state.messages, key = { it.id }) { msg ->
+                            ChatBubble(msg)
+                        }
+                        item { Spacer(Modifier.height(80.dp)) }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = SpaceDeep)
-            )
-        },
-        containerColor = SpaceBlack,
-        bottomBar = {
-            if (state.isAiEnabled && state.apiKeySet && isOnline) {
+                }
+            }
+        }
+        
+        // Floating Input Bar
+        if (state.isAiEnabled && state.apiKeySet && isOnline) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(bottom = 16.dp)
+            ) {
                 ChatInputBar(
                     value = state.currentInput,
                     onValueChange = viewModel::onInputChanged,
@@ -132,62 +245,12 @@ fun AskAiScreen(
                 )
             }
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            if (!isOnline) {
-                Surface(
-                    color = SignalPoor.copy(alpha = 0.15f),
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(Icons.Default.WifiOff, "Offline", tint = SignalPoor, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("You are offline. Connect to the internet to ask AI.", color = SignalPoor, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            }
-
-            if (!state.isAiEnabled || !state.apiKeySet) {
-                AiDisabledState(
-                    isAiEnabled = state.isAiEnabled,
-                    apiKeySet = state.apiKeySet,
-                    onNavigateToSettings = onNavigateToSettings
-                )
-            } else if (state.messages.isEmpty()) {
-                WelcomeState(
-                    onQuestionClick = {
-                        viewModel.onInputChanged(it)
-                        viewModel.sendMessage()
-                    }
-                )
-            } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(state.messages, key = { it.id }) { msg ->
-                        ChatBubble(msg)
-                    }
-                    item { Spacer(Modifier.height(20.dp)) }
-                }
-            }
-        }
     }
 
     if (showModelSelector) {
         ModalBottomSheet(
             onDismissRequest = { showModelSelector = false },
+            sheetState = sheetState,
             containerColor = SpaceCard
         ) {
             Column(
@@ -221,8 +284,11 @@ fun AskAiScreen(
 
                         Surface(
                             onClick = {
+                                scope.launch {
+                                    sheetState.hide()
+                                    showModelSelector = false
+                                }
                                 viewModel.onModelSelected(model)
-                                showModelSelector = false
                             },
                             shape = RoundedCornerShape(12.dp),
                             color = if (isSelected) CosmicBlue.copy(alpha = 0.2f) else SpaceDeep,
@@ -254,53 +320,32 @@ private fun WelcomeState(onQuestionClick: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
+            .padding(horizontal = 24.dp)
+            .padding(top = 60.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        Spacer(Modifier.height(16.dp))
-
-        // Animated AI orb
         val infiniteTransition = rememberInfiniteTransition(label = "orb")
         val orbScale by infiniteTransition.animateFloat(
-            initialValue = 0.92f, targetValue = 1.08f,
+            initialValue = 0.95f, targetValue = 1.05f,
             animationSpec = infiniteRepeatable(tween(2000), RepeatMode.Reverse),
             label = "orbScale"
         )
-
-        Box(
-            modifier = Modifier
-                .size(80.dp * orbScale)
-                .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(listOf(CosmicBlue.copy(alpha = 0.4f), CosmicBlue.copy(alpha = 0f)))
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(Brush.radialGradient(listOf(CosmicBlueDark, SpaceCard))),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.AutoAwesome, null, tint = StarWhite, modifier = Modifier.size(28.dp))
-            }
-        }
-
-        Text(
-            "SkySense AI",
-            style = MaterialTheme.typography.headlineSmall,
-            color = StarWhite
-        )
-        Text(
-            "Ask anything about your GPS signal, satellites, or how GNSS works. Your live location context is automatically included.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MoonGrey
+        
+        Icon(
+            Icons.Default.AutoAwesome,
+            contentDescription = null,
+            tint = CosmicBlue,
+            modifier = Modifier.size(48.dp).scale(orbScale)
         )
 
-        HorizontalDivider(color = SpaceDivider, modifier = Modifier.padding(vertical = 4.dp))
+        Text(
+            "What should we focus on?",
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Medium),
+            color = StarWhite,
+            modifier = Modifier.padding(bottom = 32.dp)
+        )
 
         Text("Suggested questions", style = MaterialTheme.typography.titleSmall, color = DimGrey)
 
@@ -312,20 +357,24 @@ private fun WelcomeState(onQuestionClick: (String) -> Unit) {
 
 @Composable
 private fun SuggestedQuestionChip(question: String, onClick: () -> Unit) {
+    val view = LocalView.current
     Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        color = SpaceCard,
+        onClick = {
+            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            onClick()
+        },
+        shape = RoundedCornerShape(percent = 50),
+        color = Color.Transparent,
+        border = androidx.compose.foundation.BorderStroke(1.dp, SpaceCard),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.QuestionAnswer, null, tint = CosmicBlue, modifier = Modifier.size(16.dp))
-            Text(question, style = MaterialTheme.typography.bodyMedium, color = MoonGrey, modifier = Modifier.weight(1f))
-            Icon(Icons.Default.ChevronRight, null, tint = DimGrey, modifier = Modifier.size(16.dp))
+            Icon(Icons.Default.Search, null, tint = DimGrey, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(12.dp))
+            Text(question, style = MaterialTheme.typography.bodyMedium, color = StarWhite)
         }
     }
 }
@@ -420,48 +469,54 @@ private fun ChatInputBar(
     onSend: () -> Unit,
     isLoading: Boolean
 ) {
-    Surface(
-        color = SpaceDeep,
-        tonalElevation = 8.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-                .navigationBarsPadding(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+    Box(modifier = Modifier.padding(16.dp)) {
+        Surface(
+            color = SpaceDeep,
+            shape = RoundedCornerShape(percent = 50),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            OutlinedTextField(
-                value = value,
-                onValueChange = onValueChange,
-                placeholder = { Text("Ask about your GPS…", color = DimGrey) },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(20.dp),
-                maxLines = 3,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = CosmicBlue,
-                    unfocusedBorderColor = SpaceDivider,
-                    focusedTextColor = StarWhite,
-                    unfocusedTextColor = StarWhite,
-                    cursorColor = CosmicBlue,
-                    focusedContainerColor = SpaceCard,
-                    unfocusedContainerColor = SpaceCard
-                )
-            )
-            FilledIconButton(
-                onClick = onSend,
-                enabled = value.isNotBlank() && !isLoading,
-                colors = IconButtonDefaults.filledIconButtonColors(containerColor = CosmicBlue)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = StarWhite,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(Icons.Default.Send, "Send", tint = SpaceBlack)
+                
+                androidx.compose.foundation.text.BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.weight(1f),
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = StarWhite),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(CosmicBlue),
+                    maxLines = 3,
+                    decorationBox = { innerTextField ->
+                        Box(contentAlignment = Alignment.CenterStart) {
+                            if (value.isEmpty()) {
+                                Text("Ask Gemini", color = DimGrey, style = MaterialTheme.typography.bodyLarge)
+                            }
+                            innerTextField()
+                        }
+                    }
+                )
+                val view = LocalView.current
+                FilledIconButton(
+                    onClick = {
+                        onSend()
+                    },
+                    enabled = value.isNotBlank() && !isLoading,
+                    modifier = Modifier.size(40.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = CosmicBlue.copy(alpha = 0.2f))
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = StarWhite,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(Icons.Default.Send, "Send", tint = StarWhite, modifier = Modifier.size(18.dp))
+                    }
                 }
             }
         }

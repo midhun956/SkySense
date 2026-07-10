@@ -33,6 +33,7 @@ class GeminiApiClient {
      *
      * @param userQuestion The user's question.
      * @param snapshot Current GNSS state (auto-included as context).
+     * @param envData Current environment state (location, weather, etc).
      * @param profile The prompt style profile to use.
      * @param customPromptText Used only when profile = CUSTOM.
      * @param apiKey The user's Gemini API key (never hardcoded).
@@ -41,6 +42,8 @@ class GeminiApiClient {
     suspend fun ask(
         userQuestion: String,
         snapshot: GnssSnapshot,
+        satellites: List<com.skysense.app.data.model.SatelliteInfo>,
+        envData: com.skysense.app.data.model.EnvironmentData?,
         profile: PromptProfile,
         customPromptText: String = "",
         apiKey: String,
@@ -65,14 +68,14 @@ class GeminiApiClient {
                 return@withContext Result.failure(Exception("No suitable Gemini model found for this API key. Try generating a new key from Google AI Studio."))
             }
 
-            val gnssContext = buildGnssContext(snapshot)
+            val gnssContext = buildGnssContext(snapshot, satellites, envData)
 
             val fullPrompt = """
                 You are SkySense AI, an expert GNSS educator built into a satellite visualization app.
                 
                 Style instruction: $systemStyle
                 
-                Current GNSS Context (live data from the user's device):
+                Current Context (live data from the user's device):
                 $gnssContext
                 
                 User question: $userQuestion
@@ -114,12 +117,31 @@ class GeminiApiClient {
         }
     }
 
-    private fun buildGnssContext(s: GnssSnapshot): String {
+    private fun buildGnssContext(s: GnssSnapshot, satellites: List<com.skysense.app.data.model.SatelliteInfo>, e: com.skysense.app.data.model.EnvironmentData?): String {
         if (!s.hasValidFix) return "No GPS fix yet — the device is searching for satellites."
         val constellations = s.constellationsUsed.joinToString(", ") { it.displayName }
+        
+        val envString = if (e != null) {
+            "Location: ${e.locationName ?: "Unknown"}\n" +
+            "Weather: ${e.weatherCondition ?: "Unknown"} (${e.temperatureC?.let { "$it°C" } ?: "Unknown"})\n" +
+            "Elevation: ${e.elevationMeters?.let { "$it m" } ?: "Unknown"}\n" +
+            "Offline Mode: ${e.isOfflineMode}"
+        } else {
+            "Environment Data: Not available"
+        }
+
+        val usedSatellites = satellites.filter { it.usedInFix }
+        val unusedSatellites = satellites.filter { !it.usedInFix }
+        
+        val usedSnrStr = usedSatellites.joinToString(", ") { "${it.constellation.name}(${it.svid}): ${"%.1f".format(it.cn0DbHz)}dB" }
+        val unusedSnrStr = unusedSatellites.take(15).joinToString(", ") { "${it.constellation.name}(${it.svid}): ${"%.1f".format(it.cn0DbHz)}dB" }
+
         return """
-            - Location: ${"%.6f".format(s.latitude)}°, ${"%.6f".format(s.longitude)}
-            - Altitude: ${"%.1f".format(s.altitude)} m
+            $envString
+            
+            Latitude: ${"%.5f".format(s.latitude)}
+            Longitude: ${"%.5f".format(s.longitude)}
+            Altitude: ${"%.1f".format(s.altitude)} meters
             - Horizontal accuracy: ${"%.1f".format(s.horizontalAccuracy)} m
             - Vertical accuracy: ${"%.1f".format(s.verticalAccuracy)} m
             - Speed: ${"%.1f".format(s.speed)} m/s
@@ -127,6 +149,12 @@ class GeminiApiClient {
             - Satellites visible: ${s.satellitesVisible}
             - Constellations active: $constellations
             - PDOP: ${"%.2f".format(s.pdop)}, HDOP: ${"%.2f".format(s.hdop)}, VDOP: ${"%.2f".format(s.vdop)}
+            
+            Detailed Satellite Signal-to-Noise Ratios (SNR / CN0):
+            - Used in fix: ${if (usedSnrStr.isEmpty()) "None" else usedSnrStr}
+            - Unused/Tracked: ${if (unusedSnrStr.isEmpty()) "None" else unusedSnrStr}
+            
+            (Note: Use this SNR and geometry data to answer questions about signal blockage, weak signals, or why certain satellites are not used. 40+ dB is strong, <20 dB is weak).
         """.trimIndent()
     }
 

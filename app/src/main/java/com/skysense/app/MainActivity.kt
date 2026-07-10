@@ -22,6 +22,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.compose.ui.platform.LocalView
+import com.skysense.app.util.performHapticSegmentTick
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,15 +68,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            @Suppress("DEPRECATION")
-            window.windowManager.defaultDisplay.supportedModes.maxByOrNull { it.refreshRate }?.let { mode ->
-                window.attributes = window.attributes.apply {
-                    preferredDisplayModeId = mode.modeId
-                }
-            }
-        }
         enableEdgeToEdge()
         checkAndRequestPermissions()
 
@@ -103,6 +99,7 @@ class MainActivity : ComponentActivity() {
                                         ?.hierarchy
                                         ?.any { it.route == item.destination.route } == true
 
+                                    val view = LocalView.current
                                     NavigationBarItem(
                                         icon = {
                                             Icon(
@@ -113,6 +110,7 @@ class MainActivity : ComponentActivity() {
                                         label = { Text(item.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                         selected = isSelected,
                                         onClick = {
+                                            view.performHapticSegmentTick()
                                             navController.navigate(item.destination.route) {
                                                 popUpTo(navController.graph.findStartDestination().id) {
                                                     saveState = true

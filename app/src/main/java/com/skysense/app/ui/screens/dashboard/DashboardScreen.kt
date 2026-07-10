@@ -18,6 +18,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalView
+import com.skysense.app.util.*
+import android.view.HapticFeedbackConstants
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -30,14 +36,18 @@ import com.skysense.app.data.repository.GnssRepository
 import com.skysense.app.domain.SignalTier
 import com.skysense.app.ui.theme.*
 
+import com.skysense.app.data.model.EnvironmentData
+import com.skysense.app.data.repository.EnvironmentRepository
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     repository: GnssRepository,
+    environmentRepository: EnvironmentRepository,
     onNavigateToAskAi: () -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
-    val viewModel: DashboardViewModel = viewModel(factory = DashboardViewModel.Factory(repository))
+    val viewModel: DashboardViewModel = viewModel(factory = DashboardViewModel.Factory(repository, environmentRepository))
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -108,6 +118,15 @@ fun DashboardScreen(
 
             // ── Main overview card ────────────────────────────────────────────
             OverviewCard(state = state)
+
+            // ── Environment context card ──────────────────────────────────────
+            state.environmentData?.let {
+                EnvironmentCard(
+                    envData = it,
+                    isRefreshing = state.isRefreshingEnvironment,
+                    onRefresh = { viewModel.refreshEnvironment() }
+                )
+            }
 
             // ── Metrics grid ──────────────────────────────────────────────────
             MetricsGrid(snapshot = state.snapshot)
@@ -408,4 +427,121 @@ fun ConstellationType.color(): Color = when (this) {
     ConstellationType.IRNSS -> IrnssColor
     ConstellationType.SBAS -> SbasColor
     ConstellationType.UNKNOWN -> UnknownSatColor
+}
+
+@Composable
+private fun EnvironmentCard(
+    envData: EnvironmentData,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit
+) {
+    val view = LocalView.current
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = SpaceCard,
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Cloud, contentDescription = "Environment", tint = CosmicBlue, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Environment Context", style = MaterialTheme.typography.titleMedium, color = StarWhite, fontWeight = FontWeight.Bold)
+                
+                Spacer(Modifier.weight(1f))
+                
+                if (envData.isOfflineMode) {
+                    Surface(shape = RoundedCornerShape(50), color = SignalPoor.copy(alpha = 0.15f)) {
+                        Text(
+                            "Offline",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SignalPoor
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                }
+
+                var wasRefreshing by remember { mutableStateOf(isRefreshing) }
+                val rotation = remember { Animatable(0f) }
+                LaunchedEffect(isRefreshing) {
+                    if (wasRefreshing && !isRefreshing) {
+                        view.performHapticGestureEnd()
+                    }
+                    wasRefreshing = isRefreshing
+
+                    if (isRefreshing) {
+                        rotation.animateTo(
+                            targetValue = rotation.value + 360f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1000, easing = LinearEasing),
+                                repeatMode = RepeatMode.Restart
+                            )
+                        )
+                    } else {
+                        val current = rotation.value
+                        val target = current + (360f - current % 360f)
+                        rotation.animateTo(target, tween(300, easing = FastOutSlowInEasing))
+                    }
+                }
+
+                IconButton(
+                    onClick = { 
+                        if (!isRefreshing) onRefresh() 
+                    },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = "Refresh",
+                        tint = StarWhite,
+                        modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = rotation.value }
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Location
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("LOCATION", style = MaterialTheme.typography.labelSmall, color = MoonGrey)
+                    Spacer(Modifier.height(4.dp))
+                    Text(envData.locationName ?: "Unknown", style = MaterialTheme.typography.bodyLarge, color = StarWhite)
+                }
+
+                // Weather
+                if (envData.temperatureC != null && envData.weatherCondition != null) {
+                    Column(modifier = Modifier.weight(1.4f)) {
+                        Text("WEATHER", style = MaterialTheme.typography.labelSmall, color = MoonGrey)
+                        Spacer(Modifier.height(4.dp))
+                        Text("${envData.temperatureC}°C, ${envData.weatherCondition}", style = MaterialTheme.typography.bodyLarge, color = StarWhite)
+                    }
+                }
+
+                // Elevation
+                if (envData.elevationMeters != null) {
+                    Column(
+                        modifier = Modifier.weight(0.8f),
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Text("ELEVATION", style = MaterialTheme.typography.labelSmall, color = MoonGrey)
+                        Spacer(Modifier.height(4.dp))
+                        Text("${envData.elevationMeters}m", style = MaterialTheme.typography.bodyLarge, color = StarWhite)
+                    }
+                }
+            }
+            
+            if (envData.isOfflineMode && envData.locationName == null) {
+                Text(
+                    "You are offline. Cannot fetch location or weather data.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = SignalPoor
+                )
+            }
+        }
+    }
 }

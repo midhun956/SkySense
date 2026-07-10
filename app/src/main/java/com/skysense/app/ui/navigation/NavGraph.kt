@@ -50,6 +50,7 @@ fun NavGraph(
         composable(Destination.Dashboard.route) {
             DashboardScreen(
                 repository = app.gnssRepository,
+                environmentRepository = app.environmentRepository,
                 onNavigateToAskAi = { navController.navigate(Destination.AskAi.route) },
                 onNavigateToSettings = { navController.navigate(Destination.Settings.route) }
             )
@@ -94,6 +95,7 @@ fun NavGraph(
         composable(Destination.AskAi.route) {
             AskAiScreen(
                 repository = app.gnssRepository,
+                environmentRepository = app.environmentRepository,
                 prefsManager = app.prefsManager,
                 geminiClient = app.geminiClient,
                 networkMonitor = app.networkMonitor,

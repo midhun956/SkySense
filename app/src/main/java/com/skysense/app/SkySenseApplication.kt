@@ -2,7 +2,9 @@ package com.skysense.app
 
 import android.app.Application
 import com.skysense.app.data.db.AppDatabase
+import com.skysense.app.data.remote.EnvironmentApiClient
 import com.skysense.app.data.remote.GeminiApiClient
+import com.skysense.app.data.repository.EnvironmentRepository
 import com.skysense.app.data.repository.GnssRepository
 import com.skysense.app.data.sensor.CompassManager
 import com.skysense.app.data.network.NetworkMonitor
@@ -34,4 +36,8 @@ class SkySenseApplication : Application() {
     val geminiClient by lazy { GeminiApiClient() }
 
     val networkMonitor by lazy { NetworkMonitor(this) }
+
+    val environmentApiClient by lazy { EnvironmentApiClient(this) }
+
+    val environmentRepository by lazy { EnvironmentRepository(environmentApiClient) }
 }

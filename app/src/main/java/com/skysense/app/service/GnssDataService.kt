@@ -135,9 +135,11 @@ class GnssDataService(private val context: Context) {
     fun start() {
         try {
             _isLocationEnabled.value = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
-            context.registerReceiver(
+            androidx.core.content.ContextCompat.registerReceiver(
+                context,
                 providersChangedReceiver,
-                IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION)
+                IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION),
+                androidx.core.content.ContextCompat.RECEIVER_EXPORTED
             )
             locationManager.requestLocationUpdates(
                 LocationManager.GPS_PROVIDER,
