@@ -310,7 +310,7 @@ fun SettingsContent(
             SettingsSection(title = "About", icon = Icons.Default.Info) {
                 SettingsItem {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        AboutRow("App", "SkySense v2.0.0")
+                        AboutRow("App", "SkySense v3.0.0")
                         AboutRow("Architecture", "MVVM + Repository + StateFlow")
                         AboutRow("Storage", "Room Database + DataStore")
                         AboutRow("Security", "AES-256-GCM (Tink + Android Keystore)")

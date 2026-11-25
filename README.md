@@ -28,6 +28,17 @@
 *   **Live Dashboard & Weather:** Instantly view real-time accuracy estimations, Dilution of Precision (PDOP/HDOP/VDOP), and live local weather conditions (powered by Open-Meteo) in one unified dashboard.
 *   **Ask AI Integration:** Powered by Google Gemini, ask context-aware questions. The AI is injected with your live GNSS telemetry in real-time to provide highly accurate, contextual answers.
 *   **Premium Haptic Engine:** A rich, state-driven tactile experience that physically responds to your actions (e.g., dial-ticks when selecting satellites, or distinct rumbles for success/failure).
+*   **SkySense Lab (Scientific Instruments):** A dedicated diagnostics suite with 10 specialized tools:
+    *   **Precision Clock:** Satellite-derived atomic local & UTC time (`12H`/`24H`), GPS week/TOW, oscillator bias/drift, and system clock offset.
+    *   **GNSS Hardware Inspector:** Live discovery of chipset capabilities, `GnssCapabilities`, antenna calibration, and observed bands.
+    *   **Satellite Telemetry Explorer:** Per-satellite pseudorange, Doppler shift, carrier phase (ADR), cycle-slip/multipath flags, and navigation messages.
+    *   **RF Observatory:** Per-band C/N₀ breakdown, signal waterfall, AGC monitoring, dual-frequency comparison, and experimental anomaly heuristics.
+    *   **Positioning Lab:** Stationary averaging, live ENU dispersion scatter plot (`CEP50`/`CEP95`), 2D Kalman smoothing, and true 4×4 matrix DOP.
+    *   **Advanced Altimeter:** Resolves WGS84 ellipsoidal vs. Mean Sea Level (MSL) geoid separation, terrain elevation, vertical speed, and barometer altitude.
+    *   **Satellite Prediction:** Offline TLE orbital propagation for 24-hour sky plots and optimal PDOP observation windows.
+    *   **Astronomical Instruments:** Offline Julian Date, GMST/LST, local solar time, sunrise/sunset/twilight, Sun/Moon positions, and Moon phase.
+    *   **Raw GNSS Data Recorder:** Capture and export raw epochs, NMEA, and navigation messages to **CSV**, **JSON**, **NMEA**, **GPX**, and **RINEX 3.04**.
+    *   **Receiver Controls:** Native full-tracking mode, measurement interval tuning, TTFF stopwatch, and A-GNSS HAL commands.
 *   **Constellation Explorer:** Learn the history, purpose, and fun facts about the global navigation systems orbiting above us.
 *   **Session History & Analytics:** View graphs and trends of your satellite connections and accuracy over time.
 
@@ -56,16 +67,19 @@ com.skysense.app/
 │   ├── repository/     # GnssRepository, HistoryRepository
 │   └── remote/         # GeminiApiClient (OkHttp)
 ├── service/
-│   └── GnssService     # LocationManager + GnssStatus + GnssMeasurements
+│   └── GnssDataService # Centralized Location, GnssStatus, Measurements, NavMsg & NMEA
 ├── ui/
 │   ├── theme/          # Color, Type, Theme (Space dark M3)
 │   ├── navigation/     # NavHost, Destinations
-│   ├── dashboard/      # DashboardScreen + ViewModel
-│   ├── skymap/         # SkyMapScreen + Canvas sky plot + ViewModel
-│   ├── satellite/      # SatelliteDetailScreen
-│   ├── constellation/  # ConstellationExplorerScreen
-│   └── learn/          # Learn GNSS glossary screen
-└── domain/             # LocalInterpretationEngine (Pure Kotlin)
+│   ├── components/     # Shared Lab cards, charts & telemetry components
+│   ├── screens/
+│   │   ├── dashboard/  # DashboardScreen + ViewModel
+│   │   ├── skymap/     # SkyMapScreen + Canvas sky plot
+│   │   ├── lab/        # SkySense Lab + 10 scientific instrument screens
+│   │   ├── satellite/  # SatelliteDetailScreen
+│   │   ├── learn/      # Learn GNSS glossary + Constellation Explorer
+│   │   └── history/    # Session history & analytics
+└── domain/             # GnssMath, PrecisionClockEngine, AstronomyEngine, OrbitalPropagator, KalmanFilter2D
 ```
 
 ## 🔒 Privacy & Permissions
