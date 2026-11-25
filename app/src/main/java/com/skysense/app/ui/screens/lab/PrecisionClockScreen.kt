@@ -34,7 +34,7 @@ fun PrecisionClockScreen(
     val view = androidx.compose.ui.platform.LocalView.current
     var use24Hour by remember { mutableStateOf(false) }
 
-    // Calm 4Hz monotonic check so seconds flip crisply without screen jitter
+    // Second-aligned tick so the UI only recomposes once per second on the flip
     var nowElapsedNanos by remember { mutableLongStateOf(SystemClock.elapsedRealtimeNanos()) }
     var nowSystemMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
@@ -42,7 +42,8 @@ fun PrecisionClockScreen(
         while (true) {
             nowElapsedNanos = SystemClock.elapsedRealtimeNanos()
             nowSystemMs = System.currentTimeMillis()
-            delay(250L)
+            val msToNextSecond = (1000L - (nowSystemMs % 1000L) + 15L).coerceIn(100L, 1020L)
+            delay(msToNextSecond)
         }
     }
 

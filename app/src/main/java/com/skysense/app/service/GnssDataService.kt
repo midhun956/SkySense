@@ -17,6 +17,7 @@ import android.location.OnNmeaMessageListener
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
@@ -47,7 +48,16 @@ class GnssDataService(private val context: Context) {
     }
 
     private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private var workerThread: HandlerThread? = null
+    private var workerHandler: Handler? = null
+
+    private fun ensureWorkerHandler(): Handler {
+        val existing = workerHandler
+        if (existing != null && workerThread?.isAlive == true) return existing
+        val thread = HandlerThread("SkySenseGnssWorker").apply { start() }
+        workerThread = thread
+        return Handler(thread.looper).also { workerHandler = it }
+    }
 
     // ── Public State Flows ────────────────────────────────────────────────────
 
@@ -104,10 +114,14 @@ class GnssDataService(private val context: Context) {
 
     // ── Internal tracking ─────────────────────────────────────────────────────
 
-    private val measurementCn0Map = mutableMapOf<Pair<Int, Int>, Float>()
-    private val measurementFreqMap = mutableMapOf<Pair<Int, Int>, Float>()
-    private var lastLocation: Location? = null
-    private var isStarted = false
+    private val measurementCn0Map = java.util.concurrent.ConcurrentHashMap<Pair<Int, Int>, Float>()
+    private val measurementFreqMap = java.util.concurrent.ConcurrentHashMap<Pair<Int, Int>, Float>()
+    private val navBuffer = ArrayDeque<NavMessageData>(MAX_NAV_BUFFER)
+    private val nmeaBuffer = ArrayDeque<NmeaMessageData>(MAX_NMEA_BUFFER)
+    private var lastNmeaFlowEmitMs = 0L
+    private var lastCapSignature: Int = 0
+    @Volatile private var lastLocation: Location? = null
+    @Volatile private var isStarted = false
     private var lastMeasurementEpochMs = 0L
     private var ttffStartMs: Long? = null
 
@@ -285,7 +299,15 @@ class GnssDataService(private val context: Context) {
             }
 
             _receiverControlState.value = _receiverControlState.value.copy(measurementRateHz = rateHz)
-            refreshHardwareCapabilities(rateHz)
+            // Only re-inspect hardware capabilities when observed feature signature changes
+            val capSig = (rawList.size > 0).hashCode() * 31 +
+                _agcMeasurements.value.isNotEmpty().hashCode() * 17 +
+                _satellites.value.map { it.constellation }.toSet().hashCode() +
+                rawList.map { it.frequencyBandLabel }.toSet().hashCode()
+            if (capSig != lastCapSignature) {
+                lastCapSignature = capSig
+                refreshHardwareCapabilities(rateHz)
+            }
         }
     }
 
@@ -305,7 +327,11 @@ class GnssDataService(private val context: Context) {
                 timestampMs = System.currentTimeMillis()
             )
             _navEvents.tryEmit(msg)
-            _navMessages.value = (_navMessages.value + msg).takeLast(MAX_NAV_BUFFER)
+            synchronized(navBuffer) {
+                if (navBuffer.size >= MAX_NAV_BUFFER) navBuffer.removeFirst()
+                navBuffer.addLast(msg)
+                _navMessages.value = navBuffer.toList()
+            }
         }
     }
 
@@ -313,7 +339,15 @@ class GnssDataService(private val context: Context) {
         val trimmed = message.trim()
         val data = NmeaMessageData(trimmed, timestamp)
         _nmeaEvents.tryEmit(data)
-        _nmeaMessages.value = (_nmeaMessages.value + data).takeLast(MAX_NMEA_BUFFER)
+        val now = SystemClock.elapsedRealtime()
+        synchronized(nmeaBuffer) {
+            if (nmeaBuffer.size >= MAX_NMEA_BUFFER) nmeaBuffer.removeFirst()
+            nmeaBuffer.addLast(data)
+            if (now - lastNmeaFlowEmitMs >= 500L) {
+                lastNmeaFlowEmitMs = now
+                _nmeaMessages.value = nmeaBuffer.toList()
+            }
+        }
 
         if (trimmed.startsWith("\$GPGGA") || trimmed.startsWith("\$GNGGA")) {
             parseNmeaGga(trimmed, timestamp)?.let { gga ->
@@ -339,10 +373,11 @@ class GnssDataService(private val context: Context) {
                 IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION),
                 ContextCompat.RECEIVER_EXPORTED
             )
-            registerLocationAndMeasurementListeners()
-            locationManager.registerGnssStatusCallback(gnssStatusCallback, mainHandler)
-            locationManager.registerGnssNavigationMessageCallback(navMessageCallback, mainHandler)
-            locationManager.addNmeaListener(nmeaListener, mainHandler)
+            val handler = ensureWorkerHandler()
+            registerLocationAndMeasurementListeners(handler)
+            locationManager.registerGnssStatusCallback(gnssStatusCallback, handler)
+            locationManager.registerGnssNavigationMessageCallback(navMessageCallback, handler)
+            locationManager.addNmeaListener(nmeaListener, handler)
             refreshHardwareCapabilities(0f)
             Log.d(TAG, "Centralized GNSS service started")
         } catch (e: Exception) {
@@ -363,6 +398,9 @@ class GnssDataService(private val context: Context) {
             locationManager.unregisterGnssMeasurementsCallback(measurementCallback)
             locationManager.unregisterGnssNavigationMessageCallback(navMessageCallback)
             locationManager.removeNmeaListener(nmeaListener)
+            workerThread?.quitSafely()
+            workerThread = null
+            workerHandler = null
             _isReceivingUpdates.value = false
             Log.d(TAG, "GNSS service stopped")
         } catch (e: Exception) {
@@ -371,7 +409,7 @@ class GnssDataService(private val context: Context) {
     }
 
     @SuppressLint("MissingPermission")
-    private fun registerLocationAndMeasurementListeners() {
+    private fun registerLocationAndMeasurementListeners(handler: Handler = ensureWorkerHandler()) {
         val ctrl = _receiverControlState.value
         val locInterval = if (ctrl.highPerformanceMode) 500L else DEFAULT_MIN_TIME_MS
         locationManager.requestLocationUpdates(
@@ -379,16 +417,16 @@ class GnssDataService(private val context: Context) {
             locInterval,
             MIN_DISTANCE_M,
             locationListener,
-            Looper.getMainLooper()
+            handler.looper
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val req = GnssMeasurementRequest.Builder()
                 .setFullTracking(ctrl.fullTrackingEnabled || ctrl.highPerformanceMode)
                 .setIntervalMillis(if (ctrl.highPerformanceMode) 1000 else ctrl.measurementIntervalMs)
                 .build()
-            locationManager.registerGnssMeasurementsCallback(req, ContextCompat.getMainExecutor(context), measurementCallback)
+            locationManager.registerGnssMeasurementsCallback(req, { runnable -> handler.post(runnable) }, measurementCallback)
         } else {
-            locationManager.registerGnssMeasurementsCallback(measurementCallback, mainHandler)
+            locationManager.registerGnssMeasurementsCallback(measurementCallback, handler)
         }
     }
 

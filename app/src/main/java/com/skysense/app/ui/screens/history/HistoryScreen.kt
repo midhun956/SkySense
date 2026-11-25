@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-// Vico charts removed temporarily due to API changes
 import com.skysense.app.data.db.GnssHistoryEntity
 import com.skysense.app.data.repository.GnssRepository
 import com.skysense.app.ui.theme.*

@@ -14,6 +14,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -48,7 +49,7 @@ private val bottomNavItems = listOf(
     BottomNavItem(Destination.Dashboard, "Dashboard", Icons.Default.Dashboard),
     BottomNavItem(Destination.SkyMap, "Sky Map", Icons.Default.Satellite),
     BottomNavItem(Destination.Lab, "Lab", Icons.Default.Science),
-    BottomNavItem(Destination.Learn, "Learn", Icons.Default.MenuBook),
+    BottomNavItem(Destination.Learn, "Learn", Icons.AutoMirrored.Filled.MenuBook),
     BottomNavItem(Destination.History, "History", Icons.Default.BarChart)
 )
 
@@ -146,14 +147,12 @@ class MainActivity : ComponentActivity() {
         if (hasLocationPermission()) {
             startGnssService()
         }
-        app.compassManager.start()
     }
 
     override fun onStop() {
         super.onStop()
         app.gnssRepository.stopGnss()
         app.gnssRepository.stopRecording()
-        app.compassManager.stop()
     }
 
     private fun checkAndRequestPermissions() {

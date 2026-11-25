@@ -65,10 +65,11 @@ class CompassManager(context: Context) : SensorEventListener {
                 var delta = azimuthDegrees - lastAzimuth
                 if (delta > 180f) delta -= 360f
                 else if (delta < -180f) delta += 360f
+                if (kotlin.math.abs(delta) < 0.35f) return
                 continuousAzimuth += delta
                 lastAzimuth = azimuthDegrees
             }
-            
+
             _heading.value = continuousAzimuth
         }
     }

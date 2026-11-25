@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -79,7 +80,7 @@ fun SettingsContent(
                 title = { Text("Settings", color = StarWhite) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, "Back", tint = MoonGrey)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = MoonGrey)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SpaceDeep)

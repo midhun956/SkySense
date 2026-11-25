@@ -70,9 +70,6 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.gson)
 
-    // Charts
-    implementation(libs.vico.compose.m3)
-
     // Test
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

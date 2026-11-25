@@ -62,11 +62,10 @@ fun SkyMapScreen(
     val heading by viewModel.heading.collectAsStateWithLifecycle()
     var filterType by remember { mutableStateOf<String?>(null) }
 
-    val animatedHeading by animateFloatAsState(
-        targetValue = heading,
-        animationSpec = spring(stiffness = Spring.StiffnessLow),
-        label = "HeadingAnim"
-    )
+    DisposableEffect(compassManager) {
+        compassManager.start()
+        onDispose { compassManager.stop() }
+    }
 
     Scaffold(
         topBar = {
@@ -96,7 +95,7 @@ fun SkyMapScreen(
                     SkyPlot(
                         satellites = satellites,
                         selected = selected,
-                        heading = animatedHeading,
+                        targetHeading = heading,
                         onSatelliteTap = { sat ->
                             view.performHapticSegmentTick()
                             viewModel.selectSatellite(sat)
@@ -138,9 +137,14 @@ fun SkyMapScreen(
 private fun SkyPlot(
     satellites: List<SatelliteInfo>,
     selected: SatelliteInfo?,
-    heading: Float,
+    targetHeading: Float,
     onSatelliteTap: (SatelliteInfo) -> Unit
 ) {
+    val heading by animateFloatAsState(
+        targetValue = targetHeading,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "HeadingAnim"
+    )
     val textMeasurer = rememberTextMeasurer()
     var canvasSize by remember { mutableStateOf(Pair(0f, 0f)) }
     val satPositions = remember(satellites, canvasSize) {
