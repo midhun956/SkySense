@@ -11,16 +11,17 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import kotlinx.coroutines.launch
 import com.skysense.app.SkySenseApplication
 import com.skysense.app.ui.screens.askai.AskAiScreen
 import com.skysense.app.ui.screens.constellation.ConstellationExplorerScreen
 import com.skysense.app.ui.screens.dashboard.DashboardScreen
 import com.skysense.app.ui.screens.history.HistoryScreen
+import com.skysense.app.ui.screens.lab.*
 import com.skysense.app.ui.screens.learn.LearnScreen
 import com.skysense.app.ui.screens.satellite.SatelliteDetailScreen
 import com.skysense.app.ui.screens.settings.SettingsScreen
 import com.skysense.app.ui.screens.skymap.SkyMapScreen
+import kotlinx.coroutines.launch
 
 @Composable
 fun NavGraph(
@@ -32,19 +33,19 @@ fun NavGraph(
         startDestination = Destination.Dashboard.route,
         enterTransition = {
             fadeIn(animationSpec = tween(300)) +
-            slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(300))
+                slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(300))
         },
         exitTransition = {
             fadeOut(animationSpec = tween(200)) +
-            slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(200))
+                slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(200))
         },
         popEnterTransition = {
             fadeIn(animationSpec = tween(300)) +
-            slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(300))
+                slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(300))
         },
         popExitTransition = {
             fadeOut(animationSpec = tween(200)) +
-            slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(200))
+                slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(200))
         }
     ) {
         composable(Destination.Dashboard.route) {
@@ -64,11 +65,18 @@ fun NavGraph(
                 }
             )
         }
+        composable(Destination.Lab.route) {
+            LabScreen(
+                onNavigateToInstrument = { route -> navController.navigate(route) }
+            )
+        }
         composable(Destination.Constellations.route) {
             ConstellationExplorerScreen()
         }
         composable(Destination.Learn.route) {
-            LearnScreen()
+            LearnScreen(
+                onNavigateToConstellations = { navController.navigate(Destination.Constellations.route) }
+            )
         }
         composable(Destination.History.route) {
             HistoryScreen(repository = app.gnssRepository)
@@ -89,6 +97,9 @@ fun NavGraph(
                 constellationName = constellation,
                 band = band,
                 repository = app.gnssRepository,
+                onOpenRawTelemetry = { s, c ->
+                    navController.navigate(Destination.TelemetryExplorer.createRoute(s, c))
+                },
                 onBack = { navController.popBackStack() }
             )
         }
@@ -109,6 +120,55 @@ fun NavGraph(
                 onClearHistory = { scope.launch { app.gnssRepository.clearAllHistory() } },
                 onBack = { navController.popBackStack() }
             )
+        }
+
+        // ── SkySense Lab Instruments ─────────────────────────────────────────
+        composable(Destination.PrecisionClock.route) {
+            PrecisionClockScreen(repository = app.gnssRepository, onBack = { navController.popBackStack() })
+        }
+        composable(Destination.HardwareInspector.route) {
+            HardwareInspectorScreen(repository = app.gnssRepository, onBack = { navController.popBackStack() })
+        }
+        composable(
+            route = Destination.TelemetryExplorer.route,
+            arguments = listOf(
+                navArgument("svid") { type = NavType.IntType; defaultValue = -1 },
+                navArgument("constellation") { type = NavType.StringType; nullable = true; defaultValue = null }
+            )
+        ) { backStack ->
+            val svidArg = backStack.arguments?.getInt("svid")?.takeIf { it > 0 }
+            val constArg = backStack.arguments?.getString("constellation")
+            TelemetryExplorerScreen(
+                repository = app.gnssRepository,
+                initialSvid = svidArg,
+                initialConstellation = constArg,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(Destination.RfObservatory.route) {
+            RfObservatoryScreen(repository = app.gnssRepository, onBack = { navController.popBackStack() })
+        }
+        composable(Destination.PositioningLab.route) {
+            PositioningLabScreen(repository = app.gnssRepository, onBack = { navController.popBackStack() })
+        }
+        composable(Destination.Altimeter.route) {
+            AltimeterScreen(
+                repository = app.gnssRepository,
+                environmentRepository = app.environmentRepository,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(Destination.SatellitePrediction.route) {
+            SatellitePredictionScreen(repository = app.gnssRepository, onBack = { navController.popBackStack() })
+        }
+        composable(Destination.Astronomy.route) {
+            AstronomyScreen(repository = app.gnssRepository, onBack = { navController.popBackStack() })
+        }
+        composable(Destination.DataRecorder.route) {
+            DataRecorderScreen(repository = app.gnssRepository, onBack = { navController.popBackStack() })
+        }
+        composable(Destination.ReceiverControls.route) {
+            ReceiverControlsScreen(repository = app.gnssRepository, onBack = { navController.popBackStack() })
         }
     }
 }

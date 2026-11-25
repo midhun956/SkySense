@@ -33,6 +33,7 @@ fun SatelliteDetailScreen(
     constellationName: String,
     band: String,
     repository: GnssRepository,
+    onOpenRawTelemetry: ((Int, String) -> Unit)? = null,
     onBack: () -> Unit
 ) {
     val satellites by repository.liveSatellites.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -78,6 +79,18 @@ fun SatelliteDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 SatelliteHeaderCard(satellite)
+                if (onOpenRawTelemetry != null) {
+                    Button(
+                        onClick = { onOpenRawTelemetry(satellite.svid, satellite.constellation.name) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = CosmicBlueDark, contentColor = StarWhite)
+                    ) {
+                        Icon(Icons.Default.Science, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Inspect Raw Telemetry (Lab)")
+                    }
+                }
                 SatelliteMetricsCard(satellite)
                 FrequencyCard(satellite)
                 EducationalCard(satellite)

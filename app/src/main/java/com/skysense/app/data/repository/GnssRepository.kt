@@ -29,6 +29,27 @@ class GnssRepository(
     val isReceivingUpdates: StateFlow<Boolean> = gnssDataService.isReceivingUpdates
     val isLocationEnabled: StateFlow<Boolean> = gnssDataService.isLocationEnabled
 
+    // Lab & scientific streams
+    val rawClock = gnssDataService.rawClock
+    val rawMeasurements = gnssDataService.rawMeasurements
+    val agcMeasurements = gnssDataService.agcMeasurements
+    val navMessages = gnssDataService.navMessages
+    val nmeaMessages = gnssDataService.nmeaMessages
+    val nmeaGgaInfo = gnssDataService.nmeaGgaInfo
+    val mslAltitudeMeters = gnssDataService.mslAltitudeMeters
+    val hardwareCapabilities = gnssDataService.hardwareCapabilities
+    val receiverControlState = gnssDataService.receiverControlState
+    val measurementEpochEvents = gnssDataService.measurementEpochEvents
+    val nmeaEvents = gnssDataService.nmeaEvents
+    val navEvents = gnssDataService.navEvents
+
+    fun applyReceiverControls(fullTracking: Boolean? = null, intervalMs: Int? = null, highPerformance: Boolean? = null) =
+        gnssDataService.applyReceiverControls(fullTracking, intervalMs, highPerformance)
+
+    fun sendAgnssCommand(command: String) = gnssDataService.sendAgnssCommand(command)
+    fun startTtffMeasurement() = gnssDataService.startTtffMeasurement()
+    fun refreshHardwareCapabilities() = gnssDataService.refreshHardwareCapabilities()
+
     private var recordingJob: Job? = null
 
     fun startGnss() = gnssDataService.start()

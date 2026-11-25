@@ -95,7 +95,9 @@ private val glossaryTerms = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LearnScreen() {
+fun LearnScreen(
+    onNavigateToConstellations: () -> Unit = {}
+) {
     var searchQuery by remember { mutableStateOf("") }
     val filtered = remember(searchQuery) {
         if (searchQuery.isEmpty()) glossaryTerms
@@ -110,6 +112,13 @@ fun LearnScreen() {
         topBar = {
             TopAppBar(
                 title = { Text("Learn", color = StarWhite) },
+                actions = {
+                    TextButton(onClick = onNavigateToConstellations) {
+                        Icon(Icons.Default.Public, null, tint = CosmicBlue, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Constellations", color = CosmicBlue)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SpaceDeep)
             )
         },

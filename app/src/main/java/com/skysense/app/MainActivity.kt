@@ -47,7 +47,7 @@ data class BottomNavItem(
 private val bottomNavItems = listOf(
     BottomNavItem(Destination.Dashboard, "Dashboard", Icons.Default.Dashboard),
     BottomNavItem(Destination.SkyMap, "Sky Map", Icons.Default.Satellite),
-    BottomNavItem(Destination.Constellations, "Constellations", Icons.Default.Public),
+    BottomNavItem(Destination.Lab, "Lab", Icons.Default.Science),
     BottomNavItem(Destination.Learn, "Learn", Icons.Default.MenuBook),
     BottomNavItem(Destination.History, "History", Icons.Default.BarChart)
 )
